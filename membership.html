@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BulSU Membership Management</title>
+    <link rel="stylesheet" href="members.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+   
+   <header class="header">
+    <div class="nav-container">
+      <a href="index.html" class="logo">BulSU MMS</a>
+      <nav>
+        <ul class="nav-menu">
+          <li><a href="membership.html"><i class="fas fa-users"></i> Members</a></li>
+          <li><a href="aboutus.html"><i class="fas fa-info-circle"></i> About Us</a></li>
+          <li><a href="contactus.html"><i class="fas fa-envelope"></i> Contact Us</a></li>
+          <li><a href="index.html"><i class="fas fa-sign-out-alt"></i> Exit</a></li>
+        </ul>
+      </nav>
+      
+    </div>
+  </header>
+
+   
+    <div class="container">
+        <h1>🎓 BulSU Membership Management</h1>
+
+       
+        <div class="stats-section">
+            <div class="stat-card">
+                <div class="stat-number" id="totalMembers">0</div>
+                <div class="stat-label">Total Members</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="bsitCount">0</div>
+                <div class="stat-label">BSIT Students</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="bsedCount">0</div>
+                <div class="stat-label">BSED Students</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="otherCount">0</div>
+                <div class="stat-label">Other Courses</div>
+            </div>
+        </div>
+
+      
+        <div class="search-section">
+            <h2>🔍 Search Members</h2>
+            <div class="search-container">
+                <label for="searchInput" class="search-label">Search:</label>
+                <input type="text" id="searchInput" class="search-input" placeholder="Search by name or course..." />
+            </div>
+        </div>
+
+        
+        <div class="form-section">
+            <h2>➕ Add / Edit Member</h2>
+            <form id="memberForm" class="member-form">
+                <table class="form-table">
+                    <tr>
+                        <td>
+                            <label for="name">Full Name:</label>
+                            <input type="text" id="name" name="name" placeholder="Enter full name" required />
+                        </td>
+                        <td>
+                            <label for="email">Email Address:</label>
+                            <input type="email" id="email" name="email" placeholder="Enter email address" required />
+                        </td>
+                        <td>
+                            <label for="course">Course:</label>
+                            <input type="text" id="course" name="course" placeholder="e.g., BSIT, BSED, CHTM" required />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="3">
+                            <label for="picture">Profile Picture:</label>
+                            <input type="file" id="picture" name="picture" accept="image/*" />
+                            <div id="imagePreview" style="margin-top: 10px; display: none;">
+                                <img id="previewImg" src="" alt="Preview" style="max-width: 150px; max-height: 150px; border-radius: 8px; border: 2px solid #8B0000;" />
+                                <button type="button" id="removeImage" style="display: block; margin-top: 5px; background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer;">Remove Image</button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="3">
+                            <button type="submit" class="submit-btn" id="submitBtn">Add Member</button>
+                            <button type="button" class="submit-btn" id="cancelBtn" style="background: #6c757d; margin-left: 1rem; display: none;">Cancel Edit</button>
+                        </td>
+                    </tr>
+                </table>
+            </form>
+        </div>
+
+       
+        <div class="table-section">
+            <h2>📋 Member Directory</h2>
+            <div class="table-container">
+                <table class="member-table" id="memberTable">
+                    <thead>
+                        <tr>
+                            <th>Picture</th>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Course</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="memberTableBody">
+                       
+                    </tbody>
+                </table>
+                
+               
+                <div class="empty-state" id="emptyState" style="display: none;">
+                    <div class="empty-state-icon">👥</div>
+                    <div class="empty-state-text">No members found</div>
+                    <div class="empty-state-subtext">Add your first member using the form above</div>
+                </div>
+                
+                
+                <div class="loading" id="loadingState">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    
+    <script>
+        class MembershipManager {
+            constructor() {
+                this.members = [];
+                this.editingId = null;
+                this.init();
+            }
+
+            init() {
+                this.bindEvents();
+                this.loadMembers();
+                this.setupImageHandling();
+            }
+
+            setupImageHandling() {
+                const pictureInput = document.getElementById('picture');
+                const imagePreview = document.getElementById('imagePreview');
+                const previewImg = document.getElementById('previewImg');
+                const removeImageBtn = document.getElementById('removeImage');
+
+                pictureInput.addEventListener('change', (e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        if (file.size > 2 * 1024 * 1024) { // 2MB limit
+                            this.showNotification('Image size must be less than 2MB', 'error');
+                            pictureInput.value = '';
+                            return;
+                        }
+
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            previewImg.src = e.target.result;
+                            imagePreview.style.display = 'block';
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                });
+
+                removeImageBtn.addEventListener('click', () => {
+                    pictureInput.value = '';
+                    imagePreview.style.display = 'none';
+                    previewImg.src = '';
+                });
+            }
+
+            bindEvents() {
+              
+                document.getElementById('memberForm').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    await this.handleFormSubmit();
+                });
+
+               
+                document.getElementById('searchInput').addEventListener('input', (e) => {
+                    this.filterMembers(e.target.value);
+                });
+
+                
+                document.getElementById('cancelBtn').addEventListener('click', () => {
+                    this.cancelEdit();
+                });
+            }
+
+            async loadMembers() {
+                try {
+                    
+                    document.getElementById('loadingState').style.display = 'flex';
+                    document.getElementById('emptyState').style.display = 'none';
+
+                   
+                    const response = await fetch('members.php?action=read');
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+
+                    this.members = Array.isArray(data) ? data : [];
+                    this.renderMembers();
+                    this.updateStats();
+                } catch (error) {
+                    console.error('Error loading members:', error);
+                    this.showNotification('Error loading members: ' + error.message, 'error');
+                    this.members = [];
+                    this.renderMembers();
+                    this.updateStats();
+                } finally {
+                    document.getElementById('loadingState').style.display = 'none';
+                }
+            }
+
+            renderMembers() {
+                const tbody = document.getElementById('memberTableBody');
+                const emptyState = document.getElementById('emptyState');
+
+                if (this.members.length === 0) {
+                    tbody.innerHTML = '';
+                    emptyState.style.display = 'block';
+                    return;
+                }
+
+                emptyState.style.display = 'none';
+                
+                tbody.innerHTML = this.members.map(member => `
+                    <tr data-id="${member.id}">
+                        <td>
+                            ${member.picture ? 
+                                `<img src="${member.picture}" alt="${this.escapeHtml(member.name)}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid #8B0000;" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTAiIGhlaWdodD0iNTAiIHZpZXdCb3g9IjAgMCA1MCA1MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMjUiIGN5PSIyNSIgcj0iMjUiIGZpbGw9IiNmMGYwZjAiLz4KPHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB4PSIxMyIgeT0iMTMiPgo8cGF0aCBkPSJNMjAgMjF2LTJhNCA0IDAgMCAwLTQtNEg4YTQgNCAwIDAgMC00IDR2MiIgc3Ryb2tlPSIjOTk5IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8Y2lyY2xlIGN4PSIxMiIgY3k9IjciIHI9IjQiIHN0cm9rZT0iIzk5OSIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+Cjwvc3ZnPgo='; this.style.border='2px solid #ccc';">` : 
+                                `<div style="width: 50px; height: 50px; border-radius: 50%; background: #f0f0f0; display: flex; align-items: center; justify-content: center; border: 2px solid #ccc; color: #999; font-size: 12px;">No Photo</div>`
+                            }
+                        </td>
+                        <td><strong>${member.id}</strong></td>
+                        <td>${this.escapeHtml(member.name)}</td>
+                        <td><a href="mailto:${member.email}">${this.escapeHtml(member.email)}</a></td>
+                        <td><span class="course-badge">${this.escapeHtml(member.course)}</span></td>
+                        <td>
+                            <div class="action-buttons">
+                                <button class="btn btn-edit" onclick="memberManager.editMember('${member.id}')">
+                                    Edit
+                                </button>
+                                <button class="btn btn-delete" onclick="memberManager.deleteMember('${member.id}')">
+                                    Delete
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+
+            async handleFormSubmit() {
+                const form = document.getElementById('memberForm');
+                const formData = new FormData(form);
+                
+                const memberData = {
+                    name: formData.get('name').trim(),
+                    email: formData.get('email').trim(),
+                    course: formData.get('course').trim().toUpperCase()
+                };
+
+                // Validation
+                if (!memberData.name || !memberData.email || !memberData.course) {
+                    this.showNotification('Please fill in all fields', 'error');
+                    return;
+                }
+
+                if (memberData.name.length < 2) {
+                    this.showNotification('Name must be at least 2 characters long', 'error');
+                    return;
+                }
+
+                if (!this.isValidEmail(memberData.email)) {
+                    this.showNotification('Please enter a valid email address', 'error');
+                    return;
+                }
+
+                if (memberData.course.length < 2) {
+                    this.showNotification('Course must be at least 2 characters long', 'error');
+                    return;
+                }
+
+                //  image upload
+                const pictureFile = formData.get('picture');
+                if (pictureFile && pictureFile.size > 0) {
+                    try {
+                        const imageData = await this.convertImageToBase64(pictureFile);
+                        memberData.picture = imageData;
+                    } catch (error) {
+                        this.showNotification('Error processing image: ' + error.message, 'error');
+                        return;
+                    }
+                }
+
+                try {
+                    if (this.editingId) {
+                        await this.updateMember(this.editingId, memberData);
+                    } else {
+                        await this.addMember(memberData);
+                    }
+                } catch (error) {
+                    console.error('Error saving member:', error);
+                    this.showNotification('Error saving member: ' + error.message, 'error');
+                }
+            }
+
+            convertImageToBase64(file) {
+                return new Promise((resolve, reject) => {
+                    if (file.size > 2 * 1024 * 1024) {
+                        reject(new Error('Image size must be less than 2MB'));
+                        return;
+                    }
+
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = () => reject(new Error('Failed to read image file'));
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            async addMember(memberData) {
+                try {
+                    const response = await fetch('members.php?action=add', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(memberData)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    if (result.error) {
+                        throw new Error(result.error);
+                    }
+
+                    // RELOAD members to get updated list
+                    await this.loadMembers();
+                    this.resetForm();
+                    this.showNotification('Member added successfully!', 'success');
+
+                } catch (error) {
+                    console.error('Error adding member:', error);
+                    throw error;
+                }
+            }
+
+            editMember(id) {
+                const member = this.members.find(m => m.id === id);
+                if (!member) {
+                    this.showNotification('Member not found', 'error');
+                    return;
+                }
+
+               
+                document.getElementById('name').value = member.name;
+                document.getElementById('email').value = member.email;
+                document.getElementById('course').value = member.course;
+
+                
+                const imagePreview = document.getElementById('imagePreview');
+                const previewImg = document.getElementById('previewImg');
+                
+                if (member.picture) {
+                    previewImg.src = member.picture;
+                    imagePreview.style.display = 'block';
+                } else {
+                    imagePreview.style.display = 'none';
+                }
+
+                
+                this.editingId = id;
+                document.getElementById('submitBtn').textContent = 'Update Member';
+                document.getElementById('cancelBtn').style.display = 'inline-block';
+
+                
+                document.querySelector('.form-section').scrollIntoView({ behavior: 'smooth' });
+            }
+
+            async updateMember(id, memberData) {
+                try {
+                    const response = await fetch(`members.php?action=update&id=${encodeURIComponent(id)}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(memberData)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    if (result.error) {
+                        throw new Error(result.error);
+                    }
+
+                    
+                    await this.loadMembers();
+                    this.resetForm();
+                    this.cancelEdit();
+                    this.showNotification('Member updated successfully!', 'success');
+
+                } catch (error) {
+                    console.error('Error updating member:', error);
+                    throw error;
+                }
+            }
+
+            async deleteMember(id) {
+                const member = this.members.find(m => m.id === id);
+                if (!member) {
+                    this.showNotification('Member not found', 'error');
+                    return;
+                }
+
+                if (!confirm(`Are you sure you want to delete ${member.name}?`)) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`members.php?action=delete&id=${encodeURIComponent(id)}`, {
+                        method: 'POST'
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    if (result.error) {
+                        throw new Error(result.error);
+                    }
+
+                   
+                    if (this.editingId === id) {
+                        this.cancelEdit();
+                    }
+
+                   
+                    await this.loadMembers();
+                    this.showNotification('Member deleted successfully!', 'success');
+
+                } catch (error) {
+                    console.error('Error deleting member:', error);
+                    this.showNotification('Error deleting member: ' + error.message, 'error');
+                }
+            }
+
+            cancelEdit() {
+                this.editingId = null;
+                document.getElementById('submitBtn').textContent = 'Add Member';
+                document.getElementById('cancelBtn').style.display = 'none';
+                this.resetForm();
+            }
+
+            resetForm() {
+                document.getElementById('memberForm').reset();
+                document.getElementById('imagePreview').style.display = 'none';
+                document.getElementById('previewImg').src = '';
+            }
+
+            filterMembers(query) {
+                const rows = document.querySelectorAll('#memberTableBody tr');
+                const searchTerm = query.toLowerCase();
+
+                rows.forEach(row => {
+                    const name = row.cells[1].textContent.toLowerCase();
+                    const course = row.cells[3].textContent.toLowerCase();
+                    const email = row.cells[2].textContent.toLowerCase();
+                    
+                    const matches = name.includes(searchTerm) || 
+                                  course.includes(searchTerm) || 
+                                  email.includes(searchTerm);
+                    
+                    row.style.display = matches ? '' : 'none';
+                });
+            }
+
+            updateStats() {
+                const total = this.members.length;
+                const bsitCount = this.members.filter(m => m.course.toUpperCase().includes('BSIT')).length;
+                const bsedCount = this.members.filter(m => m.course.toUpperCase().includes('BSED')).length;
+                const otherCount = total - bsitCount - bsedCount;
+
+                document.getElementById('totalMembers').textContent = total;
+                document.getElementById('bsitCount').textContent = bsitCount;
+                document.getElementById('bsedCount').textContent = bsedCount;
+                document.getElementById('otherCount').textContent = otherCount;
+            }
+
+            isValidEmail(email) {
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                return emailRegex.test(email);
+            }
+
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            showNotification(message, type = 'success') {
+               
+                const existingNotifications = document.querySelectorAll('.notification');
+                existingNotifications.forEach(n => n.remove());
+
+               
+                const notification = document.createElement('div');
+                notification.className = `notification notification-${type}`;
+                notification.textContent = message;
+                
+               
+                Object.assign(notification.style, {
+                    position: 'fixed',
+                    top: '100px',
+                    right: '20px',
+                    padding: '1rem 1.5rem',
+                    borderRadius: '8px',
+                    color: 'white',
+                    fontWeight: '600',
+                    zIndex: '10000',
+                    transform: 'translateX(400px)',
+                    transition: 'transform 0.3s ease',
+                    background: type === 'success' ? 
+                        'linear-gradient(135deg, #28a745, #20c997)' : 
+                        'linear-gradient(135deg, #dc3545, #c82333)',
+                    maxWidth: '300px',
+                    wordWrap: 'break-word'
+                });
+
+                document.body.appendChild(notification);
+
+              
+                setTimeout(() => {
+                    notification.style.transform = 'translateX(0)';
+                }, 100);
+
+                
+                setTimeout(() => {
+                    notification.style.transform = 'translateX(400px)';
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.parentNode.removeChild(notification);
+                        }
+                    }, 300);
+                }, 4000);
+            }
+        }
+
+        
+        const memberManager = new MembershipManager();
+
+        
+        const additionalStyles = document.createElement('style');
+        additionalStyles.textContent = `
+            .course-badge {
+                background: linear-gradient(135deg, #8B0000, #A52A2A);
+                color: white;
+                padding: 0.25rem 0.5rem;
+                border-radius: 4px;
+                font-size: 0.85rem;
+                font-weight: 500;
+                text-transform: uppercase;
+                letter-spacing: 0.3px;
+            }
+
+            .notification {
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            }
+
+            /* Enhanced table styling */
+            .member-table td a {
+                color: #8B0000;
+                text-decoration: none;
+                transition: color 0.3s ease;
+            }
+
+            .member-table td a:hover {
+                color: #A52A2A;
+                text-decoration: underline;
+            }
+
+            /* Loading spinner enhancement */
+            .spinner {
+                position: relative;
+            }
+
+            .spinner::after {
+                content: '';
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 20px;
+                height: 20px;
+                border: 2px solid rgba(255, 255, 255, 0.8);
+                border-left: 2px solid transparent;
+                border-radius: 50%;
+                animation: innerSpin 0.8s linear infinite reverse;
+            }
+
+            @keyframes innerSpin {
+                0% { transform: translate(-50%, -50%) rotate(0deg); }
+                100% { transform: translate(-50%, -50%) rotate(360deg); }
+            }
+
+            /* Enhanced form focus states */
+            .form-table input:focus {
+                transform: translateY(-1px);
+            }
+
+            .search-input:focus {
+                transform: translateY(-1px);
+            }
+
+            /* Print optimizations */
+            @media print {
+                .stats-section,
+                .search-section,
+                .form-section {
+                    display: none !important;
+                }
+                
+                .member-table {
+                    width: 100% !important;
+                    font-size: 12px !important;
+                }
+                
+                .action-buttons {
+                    display: none !important;
+                }
+            }
+        `;
+        document.head.appendChild(additionalStyles);
+
+        
+        window.memberManager = memberManager;
+    </script>
+</body>
+</html>
